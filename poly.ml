@@ -169,30 +169,30 @@ let rec simplify1 (e:pExp): pExp =
 
 and simplifyTimes (li:pExp list): pExp = 
  match li with
- | Term(n1, n2) :: Term(n3, n4) :: [] ->  print_string "Times with exactly two terms. n1: " ; print_int n1 ;  print_string "\n" ;  Term(n1*n3, n2+n4)
- | Term(n1, n2) :: Term(n3, n4) :: tl -> print_string "Times with at least two terms. n1 and n3 " ; print_int n1 ; print_int n3 ; print_string "\n" ; Times(Term(n1*n3, n2+n4) :: tl)
- | hd :: [] -> print_string "Only one thing in times\n" ; hd
+ | Term(n1, n2) :: Term(n3, n4) :: [] -> Term(n1*n3, n2+n4)
+ | Term(n1, n2) :: Term(n3, n4) :: tl -> Times(Term(n1*n3, n2+n4) :: tl)
+ | hd :: [] -> hd
  | Term(n1,n2) :: Plus(list) :: tl | Plus(list) :: Term(n1,n2) :: tl -> simplifyTimes (Plus(distTerm list n1 n2) :: tl)
  (* CASE HERE FOR PLUS PLUS FOIL *)
  | Plus(li1) :: Plus(li2) :: tl -> Times(Plus(distribute (flattenPlus li1) (flattenPlus li2)) :: tl)
  | _ -> Times(flattenTimes li)
 
    (* TAKES IN PLUS LIST AND TERM n1 AND n2 -> returns list with term distributed throughout plus *)
-and distTerm (li: pExp list) (n1: int) (n2: int): pExp list = print_string "distTerm\n" ;
+and distTerm (li: pExp list) (n1: int) (n2: int): pExp list =
 match li with
-| [] -> print_string "list being distributed is empty\n" ; []
+| [] -> []
 | hd :: tl -> 
   match hd with 
-  | Term(n3, n4) ->  print_string "Term -> Term -> Term\n" ; Term(n1*n3, n2+n4) :: (distTerm tl n1 n2)
-  | Times(tlist) -> print_string "Times in plus distTerm\n" ; ((distTerm [(getTerm tlist)] n1 n2)) @ (distTerm tl n1 n2)
-  | Plus(plist) -> print_string "Plus in plus, not good\n" ; (distTerm plist n1 n2) @ (distTerm tl n1 n2)
+  | Term(n3, n4) -> Term(n1*n3, n2+n4) :: (distTerm tl n1 n2)
+  | Times(tlist) -> ((distTerm [(getTerm tlist)] n1 n2)) @ (distTerm tl n1 n2)
+  | Plus(plist) -> (distTerm plist n1 n2) @ (distTerm tl n1 n2)
 
 and distribute (li1: pExp list) (li2: pExp list): pExp list =
   match li1 with
   | [] -> []
   | hd :: tl -> 
     match hd with 
-    | Term(n1, n2) ->  print_string "distribute term within plus to other plus\n" ; (distTerm li2 n1 n2) @ (distribute tl li2)
+    | Term(n1, n2) -> (distTerm li2 n1 n2) @ (distribute tl li2)
     | Times(_li) ->  
       begin
         match getTerm _li with
@@ -221,8 +221,8 @@ and flattenTimes (li: pExp list): pExp list =
 
 and simplifyPlus (li:pExp list): pExp =
  match li with
- | Term(n1, n2) :: Term(n3, n4) :: []  -> print_string "Plus with exactly two terms\n" ; if n2 = n4 then Term (n1+n3, n2) else Plus(li)
- | Term(n1, n2) :: Term(n3, n4) :: li  -> print_string "Plus with at least two terms\n" ; 
+ | Term(n1, n2) :: Term(n3, n4) :: []  -> if n2 = n4 then Term (n1+n3, n2) else Plus(li)
+ | Term(n1, n2) :: Term(n3, n4) :: li  -> 
   (* Combines first two terms *)
   if n2 = n4 then Plus ( Term (n1+n3, n2) :: li ) 
   else  (* Looks at 2nd and 3rd term, so on, recursively, relies on Plus being sorted *)
@@ -232,7 +232,7 @@ and simplifyPlus (li:pExp list): pExp =
       | Plus(newlist) -> Plus(Term(n1,n2) :: newlist)
       | _ -> Plus( [Term(n1,n2) ; simExp ] )
     end 
-| hd :: [] -> print_string "Only one thing in plus\n" ; hd
+| hd :: [] -> hd
 | l -> let flat = flattenPlus l in Plus((findTimes flat []))
 
 and flattenPlus (li: pExp list): pExp list =
@@ -246,18 +246,15 @@ and flattenPlus (li: pExp list): pExp list =
     
 and findTimes (origList: pExp list ) (newList: pExp list ) : (pExp list) =
  match origList with
- | [] -> print_string "original list is empty \n" ; newList 
+ | [] -> newList 
  | (hd :: tl) -> 
   match hd with
   | Times(li) -> 
     begin 
-      print_int (List.length li) ; print_string "\n" ;
-      print_string "found times! \n" ; let list = ((simplifyTimes li) :: newList) in
-      begin
-        print_int (List.length list) ; print_string "\n" ; findTimes (List.tl origList) (list) 
-      end
+        let list = ((simplifyTimes li) :: newList) in
+        findTimes (List.tl origList) (list) 
     end
-  | _ -> print_string "searching for times! \n" ; findTimes (List.tl origList) (hd :: newList)
+  | _ -> findTimes (List.tl origList) (hd :: newList)
 
 
 
