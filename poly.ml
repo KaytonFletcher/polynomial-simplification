@@ -67,7 +67,6 @@ let rec from_expr (_e: Expr.expr) : pExp =
     | Pos(e) -> from_expr e
     | Neg(e) -> evalNeg (from_expr e)
     | Pow(e, n) -> evalPow (from_expr e) n
-        
     | Mul(e1, e2) -> Times([from_expr e1 ; from_expr e2])
     | Add(e1, e2) -> Plus([from_expr e1 ; from_expr e2])
     | Sub(e1, e2) -> Plus([from_expr e1 ; from_expr (Neg(e2))])
@@ -107,7 +106,6 @@ and compare (e1: pExp) (e2: pExp) : int =
   else if n1 < n2 then 1
   else 0
   
-
 (* Prints a pExp in nice polynomial format ax^n + ... + a1x + a0 *)
 let rec print_pExp (_e: pExp): unit =
   (* TODO *)
@@ -139,25 +137,30 @@ let rec print_pExp (_e: pExp): unit =
     | 0 -> print_int n1
     | 1 -> print_int n1 ; print_char 'x'
     | p -> print_int n1 ; print_string "x^" ; print_int p
-  ) 
+  )
 
-(* 
-  Function to simplify (one pass) pExpr
+(* HELPER FUNCTIONS *)  
+(* Converts Plus within Plus to just Plus... i.e Plus(Plus(li) ; Plus(li2) ; Term) -> Plus(li ; li2 ; Term)  *)
+let rec flattenPlus (li: pExp list): pExp list =
+  match li with
+  | [] -> []
+  | hd :: tl -> 
+    match hd with 
+    | Times(_li) -> hd :: (flattenPlus tl) 
+    | Plus(_li) -> (flattenPlus _li) @ (flattenPlus tl)
+    | Term(n1, n2) -> hd :: (flattenPlus tl)
 
-  n1 x^m1 * n2 x^m2 -> n1*n2 x^(m1+m2)
-  Term(n1,m1)*Term(n2,m2) -> Term(n1*n2,m1+m2)
+(* Same function but with times *)    
+let rec flattenTimes (li: pExp list): pExp list =
+  match li with
+  | [] -> []
+  | hd :: tl -> 
+    match hd with 
+    | Times(_li) -> (flattenTimes _li) @ (flattenTimes tl) 
+    | Plus(_li) -> hd :: (flattenTimes tl)
+    | Term(n1, n2) -> hd :: (flattenTimes tl)    
 
-  Hint 1: Keep terms in Plus[...] sorted
-  Hint 2: flatten plus, i.e. Plus[ Plus[..], ..] => Plus[..]
-  Hint 3: flatten times, i.e. times of times is times
-  Hint 4: Accumulate terms. Term(n1,m)+Term(n2,m) => Term(n1+n2,m)
-          Term(n1, m1)*Term(n2,m2) => Term(n1*n2, m1+m2)
-  Hint 5: Use distributivity, i.e. Times[Plus[..],] => Plus[Times[..],]
-    i.e. Times[Plus[Term(1,1); Term(2,2)]; Term(3,3)] 
-      => Plus[Times[Term(1,1); Term(3,3)]; Times[Term(2,2); Term(3,3)]]
-      => Plus[Term(2,3); Term(6,5)]
-  Hint 6: Find other situations that can arise
-*)
+(* Function to simplify pExpr *)
 let rec simplify1 (e:pExp): pExp =
   begin
     match e with
@@ -177,15 +180,33 @@ and simplifyTimes (li:pExp list): pExp =
  | Plus(li1) :: Plus(li2) :: tl -> Times(Plus(distribute (flattenPlus li1) (flattenPlus li2)) :: tl)
  | _ -> Times(flattenTimes li)
 
-   (* TAKES IN PLUS LIST AND TERM n1 AND n2 -> returns list with term distributed throughout plus *)
-and distTerm (li: pExp list) (n1: int) (n2: int): pExp list =
-match li with
-| [] -> []
-| hd :: tl -> 
-  match hd with 
-  | Term(n3, n4) -> Term(n1*n3, n2+n4) :: (distTerm tl n1 n2)
-  | Times(tlist) -> ((distTerm [(getTerm tlist)] n1 n2)) @ (distTerm tl n1 n2)
-  | Plus(plist) -> (distTerm plist n1 n2) @ (distTerm tl n1 n2)
+and simplifyPlus (li:pExp list): pExp =
+  match li with
+  | Term(n1, n2) :: Term(n3, n4) :: []  -> if n2 = n4 then Term (n1+n3, n2) else Plus(li)
+  | Term(n1, n2) :: Term(n3, n4) :: li  -> 
+  (* Combines first two terms *)
+  if n2 = n4 then Plus ( Term (n1+n3, n2) :: li ) 
+  else  (* Looks at 2nd and 3rd term, so on, recursively, relies on Plus being sorted *)
+    begin (* ELEGANT AS FUCK DOBRA *)
+      let simExp = simplify1 (Plus (Term(n3,n4) :: li) ) in
+      match simExp with
+      | Plus(newlist) -> Plus(Term(n1,n2) :: newlist)
+      | _ -> Plus( [Term(n1,n2) ; simExp ] )
+    end 
+  | hd :: [] -> hd
+  | l -> let flat = flattenPlus l in Plus((findTimes flat []))
+
+and findTimes (origList: pExp list ) (newList: pExp list ) : (pExp list) =
+  match origList with
+  | [] -> newList 
+  | (hd :: tl) -> 
+  match hd with
+  | Times(li) -> 
+    begin 
+        let list = ((simplifyTimes li) :: newList) in
+        findTimes (List.tl origList) (list) 
+    end
+  | _ -> findTimes (List.tl origList) (hd :: newList)  
 
 and distribute (li1: pExp list) (li2: pExp list): pExp list =
   match li1 with
@@ -197,78 +218,32 @@ and distribute (li1: pExp list) (li2: pExp list): pExp list =
       begin
         match getTerm _li with
         | Term(n1,n2) -> (distTerm li2 n1 n2) @ (distribute tl li2)
-        | _ -> print_string "ERROR" ; distribute tl li2
+        | _ -> print_string "ERROR, getTerm did not return a term" ; distribute tl li2
       end
-    | _ -> print_string "distrbute error, plus inside plus?" ; (distribute tl li2)
+    | _ -> print_string "Should not happen, plus in plus found, not dealt with by flatten plus?" ; []
 
+   (* Takes in Plus list and a Term's coefficient (n1) and power (n2) -> returns list with term distributed throughout list *)
+and distTerm (li: pExp list) (n1: int) (n2: int): pExp list =
+match li with
+| [] -> []
+| hd :: tl -> 
+  match hd with 
+  | Term(n3, n4) -> Term(n1*n3, n2+n4) :: (distTerm tl n1 n2)
+  | Times(tlist) -> ((distTerm [(getTerm tlist)] n1 n2)) @ (distTerm tl n1 n2)
+  | Plus(plist) -> (distTerm plist n1 n2) @ (distTerm tl n1 n2)
 
 and getTerm (elist: pExp list): pExp= 
 match simplifyTimes elist with
 | Term(n1, n2) -> Term(n1,n2)
 | Times(tlist) -> getTerm tlist
-| _ -> print_string "big fucky wucky" ; Term(-1, -1)
+| _ -> print_string "error, simplifyTimes should never return plus" ; Term(-1, -1)
 
 
-and flattenTimes (li: pExp list): pExp list =
-  match li with
-  | [] -> []
-  | hd :: tl -> 
-    match hd with 
-    | Times(_li) -> (flattenTimes _li) @ (flattenTimes tl) 
-    | Plus(_li) -> hd :: (flattenTimes tl)
-    | Term(n1, n2) -> hd :: (flattenTimes tl)
-
-
-and simplifyPlus (li:pExp list): pExp =
- match li with
- | Term(n1, n2) :: Term(n3, n4) :: []  -> if n2 = n4 then Term (n1+n3, n2) else Plus(li)
- | Term(n1, n2) :: Term(n3, n4) :: li  -> 
-  (* Combines first two terms *)
-  if n2 = n4 then Plus ( Term (n1+n3, n2) :: li ) 
-  else  (* Looks at 2nd and 3rd term, so on, recursively, relies on Plus being sorted *)
-    begin (* ELEGANT AS FUCK DOBRA *)
-      let simExp = simplify1 (Plus (Term(n3,n4) :: li) ) in
-      match simExp with
-      | Plus(newlist) -> Plus(Term(n1,n2) :: newlist)
-      | _ -> Plus( [Term(n1,n2) ; simExp ] )
-    end 
-| hd :: [] -> hd
-| l -> let flat = flattenPlus l in Plus((findTimes flat []))
-
-and flattenPlus (li: pExp list): pExp list =
-  match li with
-  | [] -> []
-  | hd :: tl -> 
-    match hd with 
-    | Times(_li) -> hd :: (flattenPlus tl) 
-    | Plus(_li) -> (flattenPlus _li) @ (flattenPlus tl)
-    | Term(n1, n2) -> hd :: (flattenPlus tl)
-    
-and findTimes (origList: pExp list ) (newList: pExp list ) : (pExp list) =
- match origList with
- | [] -> newList 
- | (hd :: tl) -> 
-  match hd with
-  | Times(li) -> 
-    begin 
-        let list = ((simplifyTimes li) :: newList) in
-        findTimes (List.tl origList) (list) 
-    end
-  | _ -> findTimes (List.tl origList) (hd :: newList)
-
-
-
-(* 
-  Compute if two pExp are the same 
-  Make sure this code works before you work on simplify1  
-*)
+(* Are the two expressions equal ? *)
 let equal_pExp (_e1: pExp) (_e2: pExp) :bool =
   _e1 = _e2
 
-(* Fixed point version of simplify1 
-  i.e. Apply simplify1 until no 
-  progress is made
-*)    
+(* Flattens plus and times lists, calls simplify1 until no progress is made *)    
 let rec simplify (e:pExp): pExp =
   match e with
   | Plus(li) -> 
@@ -290,7 +265,3 @@ let rec simplify (e:pExp): pExp =
       e
     else  
         simplify(rE)
-
-
-
-
