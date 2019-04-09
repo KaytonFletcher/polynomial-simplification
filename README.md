@@ -10,7 +10,9 @@ create output files that correspond to the respective input file, namely _p#.out
 If you change the code at all, insure you run **make clean** before
 recompiling with **make**
 
-For algebraic expressions that cancel terms, I left the solution with the said term, with a coefficient of zero (i.e. 4x^2 + 3x - 4x^2 -> 0x^2 + 3x).
+For algebraic expressions that cancel terms, I left the solution with the said term, with a coefficient of zero.
+
+(i.e. 4x^2 + 3x - 4x^2 -> 0x^2 + 3x)
 
 Additionally, I sorted the polynomials from highest to lowest power. I also chose to print negatives as subtraction, opting to not print parenthesis around negated terms (i.e. 7x^2 - 3x instead of 7x^2 + (-3x) )
 
