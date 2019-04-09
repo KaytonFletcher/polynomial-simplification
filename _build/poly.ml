@@ -24,7 +24,7 @@ let rec evalPow (exp: pExp) (pow: int): pExp =
     match exp with
     | Term(n1, n2) -> 
       begin
-        match n1 with
+        match n2 with
         | 0 -> Term( int_of_float ( float_of_int n1  ** float_of_int pow ), 0)
         | _ -> Term(n1, n2*pow)
       end
@@ -218,9 +218,9 @@ and distribute (li1: pExp list) (li2: pExp list): pExp list =
       begin
         match getTerm _li with
         | Term(n1,n2) -> (distTerm li2 n1 n2) @ (distribute tl li2)
-        | _ -> print_string "ERROR" ; distribute tl li2
+        | _ -> print_string "ERROR, getTerm did not return a term" ; distribute tl li2
       end
-    | _ -> print_string "distrbute error, plus inside plus?" ; []
+    | _ -> print_string "Should not happen, plus in plus found, not dealt with by flatten plus?" ; []
 
    (* Takes in Plus list and a Term's coefficient (n1) and power (n2) -> returns list with term distributed throughout list *)
 and distTerm (li: pExp list) (n1: int) (n2: int): pExp list =
@@ -236,7 +236,7 @@ and getTerm (elist: pExp list): pExp=
 match simplifyTimes elist with
 | Term(n1, n2) -> Term(n1,n2)
 | Times(tlist) -> getTerm tlist
-| _ -> print_string "big fucky wucky" ; Term(-1, -1)
+| _ -> print_string "error, simplifyTimes should never return plus" ; Term(-1, -1)
 
 
 (* Are the two expressions equal ? *)

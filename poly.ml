@@ -24,7 +24,7 @@ let rec evalPow (exp: pExp) (pow: int): pExp =
     match exp with
     | Term(n1, n2) -> 
       begin
-        match n1 with
+        match n2 with
         | 0 -> Term( int_of_float ( float_of_int n1  ** float_of_int pow ), 0)
         | _ -> Term(n1, n2*pow)
       end
