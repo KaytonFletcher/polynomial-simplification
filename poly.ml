@@ -75,10 +75,6 @@ let rec from_expr (_e: Expr.expr) : pExp =
 
 (* 
   Compute degree of a polynomial expression.
-
-  Hint 1: Degree of Term(n,m) is m
-  Hint 2: Degree of Plus[...] is the max of the degree of args
-  Hint 3: Degree of Times[...] is the sum of the degree of args 
 *)
 let rec degree (_e:pExp): int =  (* TODO *)
   match _e with
@@ -92,6 +88,7 @@ and sumDegrees (li:pExp list): int =
   | hd::tl -> sumDegrees tl + degree hd
    
 and maxDegree (li:pExp list) : int =
+(* head of sorted list always has highest degree *)
     degree (List.hd (List.sort compare li)) 
 
 (* 
@@ -136,7 +133,10 @@ let rec print_pExp (_e: pExp): unit =
     match n2 with
     | 0 -> print_int n1
     | 1 -> print_int n1 ; print_char 'x'
-    | p -> print_int n1 ; print_string "x^" ; print_int p
+    | p -> 
+      match n1 with
+      | 1 -> print_string "x^" ; print_int p
+      | _ -> print_int n1 ; print_string "x^" ; print_int p
   )
 
 (* HELPER FUNCTIONS *)  
@@ -258,10 +258,4 @@ let rec simplify (e:pExp): pExp =
       if (equal_pExp e reduceTimes) then e
       else simplify(reduceTimes) 
   end
-  | _ -> 
-  let rE = simplify1(e) in
-      (* print_pExp rE; *)
-    if (equal_pExp e rE) then
-      e
-    else  
-        simplify(rE)
+  | _ -> e
